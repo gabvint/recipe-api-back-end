@@ -11,11 +11,19 @@ router.post('/signup', async (req, res) => {
     try {
         // Check if the username is already taken
         const userInDatabase = await User.findOne({ username: req.body.username });
+        const emailInDatabase = await User.findOne({ email: req.body.email });
+        
         if (userInDatabase) {
             return res.json({error: 'Username already taken.'});
         }
+        if (emailInDatabase) {
+            return res.json({error: 'Email already taken.'});
+        }
         // Create a new user with hashed password
         const user = await User.create({
+            firstname: req.body.firstname, 
+            lastname: req.body.lastname, 
+            email: req.body.email, 
             username: req.body.username,
             hashedPassword: bcrypt.hashSync(req.body.password, SALT_LENGTH)
         })
