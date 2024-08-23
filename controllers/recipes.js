@@ -102,13 +102,39 @@ router.post('/:recipeId/comments', async (req, res) => {
         const newComment = recipe.comments[recipe.comments.length - 1]
         newComment._doc.author = req.user
 
-        res.status(200).json(newComment)
+        res.status(200).json(recipe)
 
     } catch (error) {
         res.status(500).json(error)
     }
 });
 
+
+// edit recipe comment
+router.put('/:recipeId/comments/:commentId', async (req, res) => {
+    try {
+        const recipe = await Recipe.findById(req.params.recipeId);
+        const comment = recipe.comments.id(req.params.commentId);
+        comment.text = req.body.text;
+        await recipe.save();
+        res.status(200).json(recipe);
+
+    } catch (error) {
+        res.status(500).json(error)
+    }
+})
+
+// delete recipe comment
+router.delete('/:recipeId/comments/:commentId', async (req, res) => {
+    try {
+        const recipe = await Recipe.findById(req.params.recipeId);
+        recipe.comments.remove({ _id: req.params.commentId });
+        await recipe.save();
+        res.status(200).json(recipe);
+    } catch (error) {
+        res.status(500).json(error)
+    }
+})
 
 
 
