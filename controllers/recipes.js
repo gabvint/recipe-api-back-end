@@ -91,4 +91,25 @@ router.delete('/:recipeId', async (req, res) => {
     }
 })
 
+// create recipe comments
+router.post('/:recipeId/comments', async (req, res) => {
+    try {
+        req.body.author = req.user._id
+        const recipe = await Recipe.findById(req.params.recipeId)
+        recipe.comments.push(req.body)
+        await recipe.save()
+
+        const newComment = recipe.comments[recipe.comments.length - 1]
+        newComment._doc.author = req.user
+
+        res.status(200).json(newComment)
+
+    } catch (error) {
+        res.status(500).json(error)
+    }
+});
+
+
+
+
 module.exports = router;
