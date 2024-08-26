@@ -104,7 +104,7 @@ router.post('/:recipeId/comments', async (req, res) => {
         const newComment = recipe.comments[recipe.comments.length - 1]
         newComment._doc.author = req.user
 
-        res.status(200).json(recipe)
+        res.status(200).json(newComment)
 
     } catch (error) {
         res.status(500).json(error)
@@ -119,7 +119,7 @@ router.put('/:recipeId/comments/:commentId', async (req, res) => {
         const comment = recipe.comments.id(req.params.commentId);
         comment.text = req.body.text;
         await recipe.save();
-        res.status(200).json(recipe);
+        res.status(200).json({ message: 'Ok' });
 
     } catch (error) {
         res.status(500).json(error)
@@ -133,7 +133,7 @@ router.delete('/:recipeId/comments/:commentId', async (req, res) => {
 
         recipe.comments.remove({ _id: req.params.commentId });
         await recipe.save();
-        res.status(200).json(recipe);
+        res.status(200).json({ message: 'Ok' });
     } catch (error) {
         res.status(500).json(error)
     }
