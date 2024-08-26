@@ -30,6 +30,14 @@ const ingredientSchema = new mongoose.Schema({
 
 });
 
+const instructionSchema = new mongoose.Schema({
+
+    description: {
+        type: String,
+    }
+
+});
+
 const recipeSchema = new mongoose.Schema({
 
     name: {
@@ -49,12 +57,8 @@ const recipeSchema = new mongoose.Schema({
     
     ingredients: [ingredientSchema],
 
-    instructions: {
-        type: String, 
-        required: true,
-    }, 
+    instructions: [instructionSchema],
     
-
     author: {
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'User',
