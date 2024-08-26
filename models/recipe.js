@@ -66,7 +66,9 @@ const recipeSchema = new mongoose.Schema({
 
     comments: [commentSchema],
 
-});
+    }
+
+);
 
 const Recipe = mongoose.model('Recipe', recipeSchema);
  

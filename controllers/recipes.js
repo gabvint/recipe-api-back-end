@@ -41,6 +41,8 @@ router.get('/:recipeId', async (req, res) => {
         const recipe = await Recipe.findById(req.params.recipeId).populate([
             'author', 
             'ingredients',
+            'instructions', 
+            'comments.author',
         ])
 
         res.status(200).json(recipe)
@@ -129,7 +131,6 @@ router.delete('/:recipeId/comments/:commentId', async (req, res) => {
     try {
         const recipe = await Recipe.findById(req.params.recipeId);
 
-      
         recipe.comments.remove({ _id: req.params.commentId });
         await recipe.save();
         res.status(200).json(recipe);
