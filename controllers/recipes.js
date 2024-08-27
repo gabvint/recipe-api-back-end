@@ -33,25 +33,8 @@ router.get('/', async (req, res) => {
         res.status(500).json(error);
     }
 });
-
-// get a specific recipe
-router.get('/:recipeId', async (req, res) => {
-    try {
-        const recipe = await Recipe.findById(req.params.recipeId).populate([
-            'author', 
-            'ingredients',
-            'instructions', 
-            'comments.author',
-        ])
-
-        res.status(200).json(recipe)
-    } catch (error) {
-        res.status(500).json(error)
-    }
-})
-
 // get all of the user's recipes
-router.get('/:userId', async (req, res) => {
+router.get('/user/:userId', async (req, res) => {
     try {
         console.log('userId:', req.params.userId);
         const user = await User.findById(req.params.userId)
@@ -69,6 +52,22 @@ router.get('/:userId', async (req, res) => {
         res.status(500).json(error)
     }
 })
+// get a specific recipe
+router.get('/:recipeId', async (req, res) => {
+    try {
+        const recipe = await Recipe.findById(req.params.recipeId).populate([
+            'author', 
+            'ingredients',
+            'instructions', 
+            'comments.author',
+        ])
+
+        res.status(200).json(recipe)
+    } catch (error) {
+        res.status(500).json(error)
+    }
+})
+
 
 // router.get('/myrecipes', async (req, res) => {
 //     try {
