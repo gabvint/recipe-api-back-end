@@ -33,6 +33,7 @@ router.get('/', async (req, res) => {
         res.status(500).json(error);
     }
 });
+
 // get all of the user's recipes
 router.get('/user/:userId', async (req, res) => {
     try {
@@ -52,6 +53,7 @@ router.get('/user/:userId', async (req, res) => {
         res.status(500).json(error)
     }
 })
+
 // get a specific recipe
 router.get('/:recipeId', async (req, res) => {
     try {

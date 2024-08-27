@@ -44,6 +44,11 @@ const recipeSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    
+    imageUrl: {
+        type: String, 
+        
+    },
 
     preptime: {
         type: String, 
@@ -54,6 +59,7 @@ const recipeSchema = new mongoose.Schema({
         type: String, 
         required: true,
     },
+
     
     ingredients: [ingredientSchema],
 
