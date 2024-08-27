@@ -64,15 +64,14 @@ const recipeSchema = new mongoose.Schema({
         ref: 'User',
     }, 
 
-    isPrivate: {
+    isPublic: {
         type: Boolean, 
-        default: false, // recipes are default to be public 
+        default: true, // recipes are default to be public 
     },
 
     comments: [commentSchema],
 
     }
-
 );
 
 const Recipe = mongoose.model('Recipe', recipeSchema);
