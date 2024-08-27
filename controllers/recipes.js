@@ -1,8 +1,8 @@
 const express = require('express');
 const verifyToken = require('../middleware/verify-token.js');
-const Recipe = require('../models/recipe.js');
 const router = express.Router();
-
+const Recipe = require('../models/recipe.js');
+const User = require('../models/user.js');
 
 router.use(verifyToken);
 
@@ -25,8 +25,7 @@ router.post('/', async (req, res) => {
 // get all recipes
 router.get('/', async (req, res) => {
     try {
-        const recipe = await Recipe.find({})
-         .populate('author')
+        const recipe = await Recipe.find({}).populate('author')
          res.status(200).json(recipe)
 
     } catch (error) {
@@ -50,6 +49,38 @@ router.get('/:recipeId', async (req, res) => {
         res.status(500).json(error)
     }
 })
+
+// get all of the user's recipes
+router.get('/:userId', async (req, res) => {
+    try {
+        console.log('userId:', req.params.userId);
+        const user = await User.findById(req.params.userId)
+        console.log('user', user)
+
+        if (!user){
+            res.status(404).json({ message: 'User not found' });
+        }
+        const authorRecipes = await Recipe.find({ author: user._id })
+
+        console.log('recipe', authorRecipes)
+        res.status(200).json(authorRecipes)
+
+    } catch (error) {
+        res.status(500).json(error)
+    }
+})
+
+// router.get('/myrecipes', async (req, res) => {
+//     try {
+
+//         const userRecipes = await Recipe.find({ author: req.user._id })
+
+//         res.status(200).json(userRecipes)
+
+//     } catch (error) {
+//         res.status(500).json(error)
+//     }
+// })
 
 // edit a specific recipe
 router.put('/:recipeId', async (req, res) => {
@@ -131,7 +162,7 @@ router.delete('/:recipeId/comments/:commentId', async (req, res) => {
     try {
         const recipe = await Recipe.findById(req.params.recipeId);
 
-        
+
         recipe.comments.remove({ _id: req.params.commentId });
         await recipe.save();
         res.status(200).json({ message: 'Ok' });
