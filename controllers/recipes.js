@@ -58,9 +58,7 @@ router.get('/', async (req, res) => {
 // get all of the user's recipes
 router.get('/user/:userId', async (req, res) => {
     try {
-        console.log('userId:', req.params.userId);
         const user = await User.findById(req.params.userId)
-        console.log('user', user)
 
         if (!user){
             res.status(404).json({ message: 'User not found' });
@@ -91,18 +89,6 @@ router.get('/:recipeId', async (req, res) => {
     }
 })
 
-
-// router.get('/myrecipes', async (req, res) => {
-//     try {
-
-//         const userRecipes = await Recipe.find({ author: req.user._id })
-
-//         res.status(200).json(userRecipes)
-
-//     } catch (error) {
-//         res.status(500).json(error)
-//     }
-// })
 
 // edit a specific recipe
 router.put('/:recipeId', async (req, res) => {
@@ -146,14 +132,60 @@ router.delete('/:recipeId', async (req, res) => {
     }
 })
 
+
+
 //save recipes 
 router.post('/user/:userId/favorites/:recipeId', async (req, res) => {
     try {
-        
+        const user = await User.findById(req.params.userId)
+        const recipe = await Recipe.findById(req.params.recipeId);
+        if (!recipe) {
+            return res.status(404).json({ error: 'Recipe not found' });
+        }
+
+        user.savedRecipes.push(recipe);
+        await user.save();
+
+        res.status(200).json({ message: 'Ok' });
     } catch (error) {
         res.status(500).json(error)
     }
 }) 
+
+// get user saved recipe information 
+router.get('/user/:userId/favorites', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId).populate('savedRecipes');
+       // console.log(user)
+        if (!user){
+            res.status(404).json({ message: 'User not found' });
+        }
+
+        const savedRecipes = user.savedRecipes
+        console.log('saved recipes', savedRecipes.name)
+        res.status(200).json(savedRecipes)
+
+    } catch (error) {
+        res.status(500).json(error)
+    }
+})
+
+// remove favorite recipe 
+router.delete('/user/:userId/favorites/:recipeId', async (req, res) => {
+
+    const { userId, recipeId } = req.params;
+
+    const user = await User.findById(req.params.userId)
+    
+    if (!user){
+        res.status(404).json({ message: 'User not found' });
+    }
+
+    user.savedRecipes = user.savedRecipes.filter((recipe) => recipe.toString() !== recipeId)
+    user.save()
+    res.status(200).json({ message: 'Ok'})
+
+})
 
 // create recipe comments
 router.post('/:recipeId/comments', async (req, res) => {
@@ -193,10 +225,11 @@ router.delete('/:recipeId/comments/:commentId', async (req, res) => {
     try {
         const recipe = await Recipe.findById(req.params.recipeId);
 
-
         recipe.comments.remove({ _id: req.params.commentId });
         await recipe.save();
         res.status(200).json({ message: 'Ok' });
+
+
     } catch (error) {
         res.status(500).json(error)
     }
