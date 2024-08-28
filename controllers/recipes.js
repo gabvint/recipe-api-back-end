@@ -4,14 +4,35 @@ const router = express.Router();
 const Recipe = require('../models/recipe.js');
 const User = require('../models/user.js');
 
+const multer = require('multer');
+
 router.use(verifyToken);
 
+// const storage = multer.diskStorage({
+//     destination: function (req, file, cb) {
+//         cb(null, "uploads/");
+//     }, 
+//     filename: function (req, file, cb) {
+//         cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+//     },
+// })
+
+// const upload = multer({ 
+//     storage: storage,
+//     //dest : "uploads/"
+// })
 
 // create recipes 
 router.post('/', async (req, res) => {
     try {
-
+        // console.log('image',req.file); 
+        // console.log('body',req.body); 
+        // // The file is stored in req.file
+        // const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+      
         req.body.author = req.user._id
+        //if (imageUrl) req.body.imageUrl = req.file.filename;
+
         const recipe = await Recipe.create(req.body)
         recipe._doc.author = req.user 
         res.status(201).json(recipe)
@@ -124,6 +145,15 @@ router.delete('/:recipeId', async (req, res) => {
         res.status(500).json(error)
     }
 })
+
+//save recipes 
+router.post('/user/:userId/favorites/:recipeId', async (req, res) => {
+    try {
+        
+    } catch (error) {
+        res.status(500).json(error)
+    }
+}) 
 
 // create recipe comments
 router.post('/:recipeId/comments', async (req, res) => {

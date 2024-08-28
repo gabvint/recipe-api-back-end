@@ -23,6 +23,14 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+
+    savedRecipes: [
+        {
+            type: mongoose.Schema.Types.ObjectId, 
+            ref: 'Recipe',
+        }
+    ]
+
 });
 
 userSchema.set('toJSON', {
