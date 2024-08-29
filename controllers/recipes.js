@@ -143,6 +143,10 @@ router.post('/user/:userId/favorites/:recipeId', async (req, res) => {
             return res.status(404).json({ error: 'Recipe not found' });
         }
 
+        if (user.savedRecipes.includes(recipe)){
+            res.status(404).json({ message: 'Recipe already saved' });
+        }
+
         user.savedRecipes.push(recipe);
         await user.save();
 
@@ -156,13 +160,14 @@ router.post('/user/:userId/favorites/:recipeId', async (req, res) => {
 router.get('/user/:userId/favorites', async (req, res) => {
     try {
         const user = await User.findById(req.params.userId).populate('savedRecipes');
+
        // console.log(user)
         if (!user){
             res.status(404).json({ message: 'User not found' });
         }
 
         const savedRecipes = user.savedRecipes
-        console.log('saved recipes', savedRecipes.name)
+        console.log('saved recipes', savedRecipes)
         res.status(200).json(savedRecipes)
 
     } catch (error) {
