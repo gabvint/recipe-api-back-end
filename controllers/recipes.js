@@ -46,7 +46,7 @@ router.post('/', async (req, res) => {
 // get all recipes
 router.get('/', async (req, res) => {
     try {
-        const recipe = await Recipe.find({}).populate('author')
+        const recipe = await Recipe.find({ isPublic: true }).populate('author')
          res.status(200).json(recipe)
 
     } catch (error) {
@@ -134,23 +134,21 @@ router.delete('/:recipeId', async (req, res) => {
 
 
 
-//save recipes 
+//save recipes and remove
 router.post('/user/:userId/favorites/:recipeId', async (req, res) => {
+
     try {
-        const user = await User.findById(req.params.userId)
-        const recipe = await Recipe.findById(req.params.recipeId);
-        if (!recipe) {
-            return res.status(404).json({ error: 'Recipe not found' });
+        const recipe = await Recipe.findById(req.params.recipeId)
+
+        if (recipe.savedBy.includes(req.user._id)){
+            recipe.savedBy.remove(req.user._id);
+        } else {
+            recipe.savedBy.push(req.user._id);
         }
 
-        if (user.savedRecipes.includes(recipe)){
-            res.status(404).json({ message: 'Recipe already saved' });
-        }
+        await recipe.save()
+        res.status(200).json(recipe);
 
-        user.savedRecipes.push(recipe);
-        await user.save();
-
-        res.status(200).json({ message: 'Ok' });
     } catch (error) {
         res.status(500).json(error)
     }
@@ -158,39 +156,31 @@ router.post('/user/:userId/favorites/:recipeId', async (req, res) => {
 
 // get user saved recipe information 
 router.get('/user/:userId/favorites', async (req, res) => {
+    // try {
+    //     const user = await User.findById(req.params.userId).populate('savedRecipes');
+
+    //    // console.log(user)
+    //     if (!user){
+    //         res.status(404).json({ message: 'User not found' });
+    //     }
+
+    //     const savedRecipes = user.savedRecipes
+    //     console.log('saved recipes', savedRecipes)
+    //     res.status(200).json(savedRecipes)
+
+    // } catch (error) {
+    //     res.status(500).json(error)
+    // }
+
+
     try {
-        const user = await User.findById(req.params.userId).populate('savedRecipes');
-
-       // console.log(user)
-        if (!user){
-            res.status(404).json({ message: 'User not found' });
-        }
-
-        const savedRecipes = user.savedRecipes
-        console.log('saved recipes', savedRecipes)
-        res.status(200).json(savedRecipes)
-
+        
     } catch (error) {
-        res.status(500).json(error)
+        
     }
 })
 
-// remove favorite recipe 
-router.delete('/user/:userId/favorites/:recipeId', async (req, res) => {
 
-    const { userId, recipeId } = req.params;
-
-    const user = await User.findById(req.params.userId)
-    
-    if (!user){
-        res.status(404).json({ message: 'User not found' });
-    }
-
-    user.savedRecipes = user.savedRecipes.filter((recipe) => recipe.toString() !== recipeId)
-    user.save()
-    res.status(200).json({ message: 'Ok'})
-
-})
 
 // create recipe comments
 router.post('/:recipeId/comments', async (req, res) => {

@@ -47,7 +47,7 @@ const recipeSchema = new mongoose.Schema({
     
     imageUrl: {
         type: String, 
-        
+
     },
 
     preptime: {
@@ -76,6 +76,13 @@ const recipeSchema = new mongoose.Schema({
     },
 
     comments: [commentSchema],
+
+    savedBy: [
+        {
+            type: mongoose.Schema.Types.ObjectId, 
+            ref: 'User',
+        }
+    ]
 
     }
 );
