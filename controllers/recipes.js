@@ -156,27 +156,14 @@ router.post('/user/:userId/favorites/:recipeId', async (req, res) => {
 
 // get user saved recipe information 
 router.get('/user/:userId/favorites', async (req, res) => {
-    // try {
-    //     const user = await User.findById(req.params.userId).populate('savedRecipes');
-
-    //    // console.log(user)
-    //     if (!user){
-    //         res.status(404).json({ message: 'User not found' });
-    //     }
-
-    //     const savedRecipes = user.savedRecipes
-    //     console.log('saved recipes', savedRecipes)
-    //     res.status(200).json(savedRecipes)
-
-    // } catch (error) {
-    //     res.status(500).json(error)
-    // }
-
-
+   
     try {
+        const recipes = await Recipe.find({ savedBy: req.user._id })
+        res.status(200).json(recipes)
+
         
     } catch (error) {
-        
+        res.status(500).json(error)
     }
 })
 
