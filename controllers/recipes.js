@@ -8,31 +8,12 @@ const multer = require('multer');
 
 router.use(verifyToken);
 
-// const storage = multer.diskStorage({
-//     destination: function (req, file, cb) {
-//         cb(null, "uploads/");
-//     }, 
-//     filename: function (req, file, cb) {
-//         cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
-//     },
-// })
-
-// const upload = multer({ 
-//     storage: storage,
-//     //dest : "uploads/"
-// })
 
 // create recipes 
 router.post('/', async (req, res) => {
     try {
-        // console.log('image',req.file); 
-        // console.log('body',req.body); 
-        // // The file is stored in req.file
-        // const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
-      
+       
         req.body.author = req.user._id
-        //if (imageUrl) req.body.imageUrl = req.file.filename;
-
         const recipe = await Recipe.create(req.body)
         recipe._doc.author = req.user 
         res.status(201).json(recipe)
