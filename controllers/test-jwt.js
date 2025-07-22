@@ -7,10 +7,19 @@ router.get('/sign-token', (req, res) => {
     const user = {
         _id: 1,
         username: 'test',
-        password: 'test'
+        password: 'test', 
+        role: 'admin'
     }
     // Create a token using the sign method
-    const token = jwt.sign({ user }, process.env.JWT_SECRET);
+    //const token = jwt.sign({ user }, process.env.JWT_SECRET);
+
+    const token = jwt.sign({ 
+        _id: user._id, 
+        username: user.username, 
+        role: user.role 
+    }, process.env.JWT_SECRET, { expiresIn: '1h' }); 
+
+
     res.json({ token });
 });
 
