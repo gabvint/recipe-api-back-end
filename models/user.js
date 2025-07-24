@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+
 
 const userSchema = new mongoose.Schema({
     firstname: {
@@ -53,9 +55,38 @@ const userSchema = new mongoose.Schema({
 
     securityAnswer2: { 
         type: String, required: true 
+    }, 
+
+    lastPasswordChange: {
+        type: Date, 
+        default: null
+    }, 
+
+    passwordHistory: [{
+        type: String
+    }], 
+
+    lastLoginAttempt: {
+        type: Date, 
+        default: null
     }
 
 });
+
+userSchema.methods.updatePasswordHistory = async function (newHashedPassword) {
+    this.passwordHistory.unshift(newHashedPassword); // add new pw
+    if (this.passwordHistory.length > 5){
+        this.passwordHistory.pop() // remove the oldest pw
+    }
+    this.lastPasswordChange = new Date();
+    await this.save();
+};
+
+userSchema.methods.isPasswordReused = function(newPassword) {
+    return this.passwordHistory.some(oldPasswordHash => {
+        return bcrypt.compareSync(newPassword, oldPasswordHash);  // Compare new password with each hashed password in the history
+    });
+};
 
 userSchema.set('toJSON', {
     transform: (document, returnedObject) => {
@@ -64,5 +95,7 @@ userSchema.set('toJSON', {
         delete returnedObject.securityAnswer2;
     }
 });
+
+
 
 module.exports = mongoose.model('User', userSchema);

@@ -5,6 +5,7 @@ const User = require('../models/user');
 const jwt = require('jsonwebtoken');
 
 
+
 const SALT_LENGTH = 12;
 
 const passwordRegEx = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{12,}$/;
@@ -38,9 +39,9 @@ router.post('/signup', async (req, res) => {
             email: req.body.email, 
             username: req.body.username,
             hashedPassword: bcrypt.hashSync(req.body.password, SALT_LENGTH),
-            securityQuestion1: bcrypt.hashSync(req.body.securityQuestion1, SALT_LENGTH),
+            securityQuestion1: req.body.securityQuestion1,
             securityAnswer1: bcrypt.hashSync(req.body.securityAnswer1, SALT_LENGTH),
-            securityQuestion2: bcrypt.hashSync(req.body.securityQuestion2, SALT_LENGTH),
+            securityQuestion2: req.body.securityQuestion2,
             securityAnswer2: bcrypt.hashSync(req.body.securityAnswer2, SALT_LENGTH)
         })
 
@@ -63,24 +64,14 @@ router.post('/signup', async (req, res) => {
 router.post('/signin', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.body.username });
-        // if (user && bcrypt.compareSync(req.body.password, user.hashedPassword)) {
-        //     const token = jwt.sign(
-        //         {
-        //             _id: user._id,
-        //             username: user.username,
-        //             role: user.role  
-        //         },
-        //         process.env.JWT_SECRET,  
-        //         { expiresIn: '1h' }  
-        //     );
-        //     res.status(200).json({ token });
-        // } else {
-        //     res.status(401).json({ error: 'Invalid username or password.' });
-        // }
 
         if (!user){
             res.status(401).json({ error: 'Invalid username or password.' });
         }
+
+        // track last login attempt
+        user.lastLoginAttempt = new Date();
+        await user.save();
 
         // check if the user's account is locked and if the lock time has passed
         if (user.isLocked && user.lockUntil > Date.now()) {
@@ -132,6 +123,146 @@ router.post('/signin', async (req, res) => {
             await user.save(); 
             res.status(401).json({ error: 'Invalid username or password.' });
         }
+
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+
+
+router.post('/:userId/change-password', async (req, res) => {
+    try {
+        const { username, currentPassword, newPassword, confirmPassword} = req.body;
+        const user = await User.findOne({ username });
+
+        if (!user){
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Re-authenticate user by checking current password
+        if (!bcrypt.compareSync(currentPassword, user.hashedPassword)) {
+            return res.status(401).json({ error: 'Password is incorrect.' });
+        }
+
+         // compare the new password to confirm password
+        if (newPassword !== confirmPassword){
+            return res.status(400).json({ error: "Passwords do not match "}); 
+        }
+
+        if(!passwordRegEx.test(newPassword)) {
+             return res.status(400).json({
+                error: 'New password must be at least 12 characters long and include at least one uppercase letter, one lowercase letter, one digit, and one special character.'
+            });
+        }
+
+        // Prevent password reuse: Check if new password is reused
+        if (user.isPasswordReused(newPassword)) {
+            return res.status(400).json({ error: 'You cannot reuse one of your previous passwords.' });
+        }
+
+        //Enforce password age (24 hours)
+        const oneDayInMs = 24 * 60 * 60 * 1000;  // 24 hours in milliseconds
+        if (Date.now() - user.lastPasswordChange < oneDayInMs) {
+            return res.status(400).json({ error: 'You cannot change your password within 24 hours of the last change.' });
+        }
+
+        // Hash the new password
+        const newHashedPassword = bcrypt.hashSync(newPassword, SALT_LENGTH);
+
+        // Update password history and save new password
+        await user.updatePasswordHistory(newHashedPassword);
+
+        // Update the user's password in the database
+        user.hashedPassword = newHashedPassword;
+        await user.save();
+
+        res.status(200).json({ message: 'Password updated successfully.' });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+
+});
+
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+
+        if (!user){
+            return res.status(404).json({ error: "Email not found "});
+        }
+
+        // send security questions 
+        res.status(200).json({
+            securityQuestion1: user.securityQuestion1,
+            securityQuestion2: user.securityQuestion2,
+        });
+
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.post('/forgot-password/validate', async (req, res) => {
+    try {
+        const { email, securityAnswer1, securityAnswer2 } = req.body;
+        const user = await User.findOne({ email });
+        console.log(user)
+
+        if (!user){
+            return res.status(404).json({ error: "Email not found "});
+        }
+
+        const isValidAnswer1 = bcrypt.compareSync(securityAnswer1, user.securityAnswer1);
+        const isValidAnswer2 = bcrypt.compareSync(securityAnswer2, user.securityAnswer2);
+
+        if (isValidAnswer1 && isValidAnswer2) {
+            return res.status(200).json( { message: 'Answers are valid, you can now change your password '});
+        } else {
+            res.status(400).json({ error: 'Incorrect answers' });
+        }
+
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.post('/forgot-password/change-pw', async (req, res) => {
+    try {
+        const { email, newPassword, confirmPassword } = req.body;
+        const user = await User.findOne({ email });
+        console.log(user)
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' }); 
+        }
+
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ error: 'Passwords do not match' });
+        }
+
+        if(!passwordRegEx.test(newPassword)) {
+             return res.status(400).json({
+                error: 'New password must be at least 12 characters long and include at least one uppercase letter, one lowercase letter, one digit, and one special character.'
+            });
+        }
+
+        if (user.isPasswordReused(newPassword)) {
+            return res.status(400).json({ error: 'You cannot reuse one of your previous passwords.' });
+        }
+
+        const oneDayInMs = 24 * 60 * 60 * 1000; 
+        if (Date.now() - user.lastPasswordChange < oneDayInMs) {
+            return res.status(400).json({ error: 'You cannot change your password within 24 hours of the last change.' });
+        }
+
+        const newHashedPassword = bcrypt.hashSync(newPassword, SALT_LENGTH);
+        await user.updatePasswordHistory(newHashedPassword);
+        user.hashedPassword = newHashedPassword;
+        await user.save();
+
+        res.status(200).json({ message: 'Password updated successfully.' });
 
     } catch (error) {
         res.status(400).json({ error: error.message });
