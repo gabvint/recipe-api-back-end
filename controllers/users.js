@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const User = require('../models/user');
+const Recipe = require('../models/recipe.js');
 const jwt = require('jsonwebtoken');
+const verifyToken = require('../middleware/verify-token');
 
 
 
@@ -268,5 +270,86 @@ router.post('/forgot-password/change-pw', async (req, res) => {
         res.status(400).json({ error: error.message });
     }
 });
+
+
+router.get('/me', verifyToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+    res.json({
+        firstname: user.firstname,
+        lastname: user.lastname,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+    });
+
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.put('/edit-profile', verifyToken, async (req, res) => {
+    try {
+        const { firstname, lastname, username, email } = req.body
+
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        user.firstname = firstname || user.firstname;
+        user.lastname = lastname || user.lastname;
+        user.username = username || user.username;
+        user.email = email || user.email;
+
+        await user.save();
+
+        res.json({
+            firstname: user.firstname,
+            lastname: user.lastname,
+            email: user.email,
+            username: user.username,
+            role: user.role,
+        });
+
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+}); 
+
+router.delete('/delete-account', verifyToken, async (req, res) => {
+  try {
+    const { password, securityAnswer1, securityAnswer2 } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    // Check password
+    const isPasswordCorrect = bcrypt.compareSync(password, user.hashedPassword);
+    if (!isPasswordCorrect)
+      return res.status(401).json({ error: 'Incorrect password.' });
+
+    // Check security answers (case-insensitive)
+    const isAnswer1Correct = bcrypt.compareSync(securityAnswer1.toLowerCase(), user.securityAnswer1);
+    const isAnswer2Correct = bcrypt.compareSync(securityAnswer2.toLowerCase(), user.securityAnswer2);
+    if (!isAnswer1Correct || !isAnswer2Correct)
+      return res.status(401).json({ error: 'Incorrect security answers.' });
+
+    // Delete recipes by this user
+    await Recipe.deleteMany({ author: user._id });
+
+    // Delete user
+    await User.findByIdAndDelete(user._id);
+
+    res.json({ message: 'Your account and all associated recipes have been deleted.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 module.exports = router;
