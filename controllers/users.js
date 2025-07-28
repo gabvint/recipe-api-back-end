@@ -63,7 +63,7 @@ router.post('/signup', async (req, res) => {
         res.status(201).json({ user, token });
     } catch (error) {
         await logEvent({ action: 'signup', status: 'failure', details: error.message, ip });
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ error: "Invalid request."  });
     }
 });
 
@@ -119,15 +119,27 @@ router.post('/signin', async (req, res) => {
             );
             res.status(200).json({ token }); 
         } else {
-            // increment failed login attempts 
-            await logEvent({ user: user._id, action: 'login', status: 'failure', details: 'Wrong password', ip });
             user.failedLoginAttempts += 1; 
-            console.log('Failed Login Attempt:', user.failedLoginAttempts); // debugging
+
+            await logEvent({ 
+                user: user._id, 
+                action: 'login', 
+                status: 'failure', 
+                details:  `Failed login attempt = ${user.failedLoginAttempts}`, 
+                ip 
+            });
+
 
             if (user.failedLoginAttempts >= 5){
+                await logEvent({ 
+                    user: user._id, 
+                    action: 'login', 
+                    status: 'failure', 
+                    details:  `Account locked for 15 minutes`, 
+                    ip 
+                });
                 user.isLocked = true; 
                 user.lockUntil = Date.now() + 15 * 60 * 1000; // lock for 15 mins 
-                console.log(`Account locked until: ${new Date(user.lockUntil)}`);
             }
             await user.save(); 
             res.status(401).json({ error: 'Invalid username or password.' });
@@ -135,7 +147,7 @@ router.post('/signin', async (req, res) => {
 
     } catch (error) {
         await logEvent({ action: 'login', status: 'failure', details: error.message, ip });
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ error: "Invalid request."  });
     }
 });
 
@@ -193,7 +205,7 @@ router.post('/:userId/change-password', async (req, res) => {
         res.status(200).json({ message: 'Password updated successfully.' });
     } catch (error) {
         await logEvent({ action: 'change password', status: 'failure', details: error.message, ip });
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ error: "Invalid request."  });
     }
 
 });
@@ -214,7 +226,7 @@ router.post('/forgot-password', async (req, res) => {
         });
 
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ error: "Invalid request."  });
     }
 });
 
@@ -238,7 +250,7 @@ router.post('/forgot-password/validate', async (req, res) => {
         }
 
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ error: "Invalid request."  });
     }
 });
 
@@ -283,7 +295,7 @@ router.post('/forgot-password/change-pw', async (req, res) => {
 
     } catch (error) {
         await logEvent({ action: 'forgot password', status: 'failure', details: error.message, ip });
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ error: "Invalid request."  });
     }
 });
 
@@ -304,7 +316,7 @@ router.get('/me', verifyToken, async (req, res) => {
     });
 
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ error: "Invalid request."  });
     }
 });
 
@@ -336,7 +348,7 @@ router.put('/edit-profile', verifyToken, async (req, res) => {
         await logEvent({ action: 'edit profile', status: 'success', details: "edit user credentials", ip });
     } catch (error) {
         await logEvent({ action: 'edit profile', status: 'failure', details: error.message, ip });
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ error: "Invalid request."  });
     }
 }); 
 
@@ -346,18 +358,22 @@ router.delete('/delete-account', verifyToken, async (req, res) => {
     const { password, securityAnswer1, securityAnswer2 } = req.body;
     const user = await User.findById(req.user._id);
 
-    if (!user) return res.status(404).json({ error: 'User not found.' });
+    if (!user) {
+        return res.status(404).json({ error: 'User not found.' });
+    }
 
     // Check password
     const isPasswordCorrect = bcrypt.compareSync(password, user.hashedPassword);
-    if (!isPasswordCorrect)
-      return res.status(401).json({ error: 'Incorrect password.' });
+    if (!isPasswordCorrect){
+        return res.status(401).json({ error: 'Incorrect password.' });
+    }
 
     // Check security answers (case-insensitive)
     const isAnswer1Correct = bcrypt.compareSync(securityAnswer1.toLowerCase(), user.securityAnswer1);
     const isAnswer2Correct = bcrypt.compareSync(securityAnswer2.toLowerCase(), user.securityAnswer2);
-    if (!isAnswer1Correct || !isAnswer2Correct)
-      return res.status(401).json({ error: 'Incorrect security answers.' });
+    if (!isAnswer1Correct || !isAnswer2Correct){
+        return res.status(401).json({ error: 'Incorrect security answers.' });
+    }
 
     // Delete recipes by this user
     await Recipe.deleteMany({ author: user._id });
@@ -368,8 +384,8 @@ router.delete('/delete-account', verifyToken, async (req, res) => {
     await logEvent({ action: 'delete user', status: 'success', details: "user account deleted", ip });
     return res.json({ message: 'Your account and all associated recipes have been deleted.' });
   } catch (error) {
-     await logEvent({ action: 'delete user', status: 'failure', details: error.message, ip });
-    res.status(500).json({ error: error.message });
+    await logEvent({ action: 'delete user', status: 'failure', details: error.message, ip });
+    res.status(500).json({ error: "Invalid request."   });
   }
 });
 
@@ -389,8 +405,66 @@ router.get('/logs', verifyToken, verifyRole(['admin']), async (req, res) => {
       .populate('user', 'username email role');
     res.json(logs);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch logs" });
+    res.status(500).json({ error: "Invalid request."  });
   }
+});
+
+router.get('/', verifyToken, verifyRole(['admin']), async (req, res) => {
+  try {
+    const users = await User.find({}, '-hashedPassword -securityAnswer1 -securityAnswer2').lean();
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: "Invalid request." });
+  }
+});
+router.patch('/:userid/role', verifyToken, verifyRole(['admin']), async (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    try {
+        const { userid } = req.params; 
+        const { role, adminPassword } = req.body;
+        const adminId = req.user._id;
+        
+        // Prevent admin from editing their own role
+        if (userid === adminId.toString()) {
+            return res.status(403).json({ error: "You cannot change your own role." });
+        }
+
+        // Validate role
+        if (!['admin','moderator','user'].includes(role)) {
+            return res.status(400).json({ error: "Invalid role." });
+        }
+
+        // get admin and verify pw
+        const adminUser = await User.findById(adminId);
+        if (!adminUser){
+            return res.status(401).json({ error: "Unauthorized." });
+        }
+        // Check password (make sure you have passwordMatch implemented!)
+        const passwordMatch = bcrypt.compareSync(adminPassword, adminUser.hashedPassword);
+        if (!passwordMatch){
+            return res.status(401).json({ error: "Incorrect password." });
+        }
+
+        const user = await User.findById(userid);
+        if (!user){
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        user.role = role;
+        await user.save();
+
+        await logEvent({ 
+            user: adminId, 
+            action: 'change role',
+            status: 'success', 
+            details: `Changed ${user.username} to ${role}`,
+            ip 
+        });
+
+        res.json({ message: "Role updated.", user }); 
+    } catch (error) {
+        res.status(500).json({ error: "Invalid request."  });
+    }
 });
 
 module.exports = router;
