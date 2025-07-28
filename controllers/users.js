@@ -3,8 +3,11 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const User = require('../models/user');
 const Recipe = require('../models/recipe.js');
+const Log = require('../models/logs.js');
 const jwt = require('jsonwebtoken');
 const verifyToken = require('../middleware/verify-token');
+const verifyRole = require('../middleware/verify-role');
+const logEvent = require('../utils/logEvents.js');
 
 
 
@@ -13,15 +16,14 @@ const SALT_LENGTH = 12;
 const passwordRegEx = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{12,}$/;
 
 router.post('/signup', async (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try {   
-
 
         if (!passwordRegEx.test(req.body.password)){
             return res.status(400).json({
                 error: 'Password must be at least 12 characters long and include at least one uppercase letter, one lowercase letter, one digit, and one special character.'
             }); 
         }
-
 
         // Check if the username is already taken
         const userInDatabase = await User.findOne({ username: req.body.username });
@@ -57,18 +59,22 @@ router.post('/signup', async (req, res) => {
             { expiresIn: '1h' }  // Set token expiration
         );
 
+        await logEvent({ action: 'signup', status: 'success', details: 'user created', ip });
         res.status(201).json({ user, token });
     } catch (error) {
+        await logEvent({ action: 'signup', status: 'failure', details: error.message, ip });
         res.status(400).json({ error: error.message });
     }
 });
 
 router.post('/signin', async (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try {
         const user = await User.findOne({ username: req.body.username });
 
         if (!user){
-            res.status(401).json({ error: 'Invalid username or password.' });
+            await logEvent({ action: 'login', status: 'failure', details: 'User not found', ip });
+            return res.status(401).json({ error: 'Invalid username or password.' });
         }
 
         // track last login attempt
@@ -98,6 +104,7 @@ router.post('/signin', async (req, res) => {
 
         if (passwordMatch) {
             // reset failed attempts on successful login 
+            await logEvent({ user: user._id, action: 'login', status: 'success', ip });
             user.failedLoginAttempts = 0; 
             await user.save();
 
@@ -113,7 +120,7 @@ router.post('/signin', async (req, res) => {
             res.status(200).json({ token }); 
         } else {
             // increment failed login attempts 
-
+            await logEvent({ user: user._id, action: 'login', status: 'failure', details: 'Wrong password', ip });
             user.failedLoginAttempts += 1; 
             console.log('Failed Login Attempt:', user.failedLoginAttempts); // debugging
 
@@ -127,6 +134,7 @@ router.post('/signin', async (req, res) => {
         }
 
     } catch (error) {
+        await logEvent({ action: 'login', status: 'failure', details: error.message, ip });
         res.status(400).json({ error: error.message });
     }
 });
@@ -134,6 +142,7 @@ router.post('/signin', async (req, res) => {
 
 
 router.post('/:userId/change-password', async (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try {
         const { username, currentPassword, newPassword, confirmPassword} = req.body;
         const user = await User.findOne({ username });
@@ -179,8 +188,11 @@ router.post('/:userId/change-password', async (req, res) => {
         user.hashedPassword = newHashedPassword;
         await user.save();
 
+
+        await logEvent({ action: 'change password', status: 'success', details: 'password changed', ip });
         res.status(200).json({ message: 'Password updated successfully.' });
     } catch (error) {
+        await logEvent({ action: 'change password', status: 'failure', details: error.message, ip });
         res.status(400).json({ error: error.message });
     }
 
@@ -231,6 +243,7 @@ router.post('/forgot-password/validate', async (req, res) => {
 });
 
 router.post('/forgot-password/change-pw', async (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try {
         const { email, newPassword, confirmPassword } = req.body;
         const user = await User.findOne({ email });
@@ -264,9 +277,12 @@ router.post('/forgot-password/change-pw', async (req, res) => {
         user.hashedPassword = newHashedPassword;
         await user.save();
 
+
+        await logEvent({ action: 'forgot password', status: 'success', details: 'password changed', ip });
         res.status(200).json({ message: 'Password updated successfully.' });
 
     } catch (error) {
+        await logEvent({ action: 'forgot password', status: 'failure', details: error.message, ip });
         res.status(400).json({ error: error.message });
     }
 });
@@ -293,6 +309,7 @@ router.get('/me', verifyToken, async (req, res) => {
 });
 
 router.put('/edit-profile', verifyToken, async (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try {
         const { firstname, lastname, username, email } = req.body
 
@@ -316,12 +333,15 @@ router.put('/edit-profile', verifyToken, async (req, res) => {
             role: user.role,
         });
 
+        await logEvent({ action: 'edit profile', status: 'success', details: "edit user credentials", ip });
     } catch (error) {
+        await logEvent({ action: 'edit profile', status: 'failure', details: error.message, ip });
         res.status(400).json({ error: error.message });
     }
 }); 
 
 router.delete('/delete-account', verifyToken, async (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   try {
     const { password, securityAnswer1, securityAnswer2 } = req.body;
     const user = await User.findById(req.user._id);
@@ -345,11 +365,32 @@ router.delete('/delete-account', verifyToken, async (req, res) => {
     // Delete user
     await User.findByIdAndDelete(user._id);
 
-    res.json({ message: 'Your account and all associated recipes have been deleted.' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    await logEvent({ action: 'delete user', status: 'success', details: "user account deleted", ip });
+    return res.json({ message: 'Your account and all associated recipes have been deleted.' });
+  } catch (error) {
+     await logEvent({ action: 'delete user', status: 'failure', details: error.message, ip });
+    res.status(500).json({ error: error.message });
   }
 });
 
+
+router.get('/logs', verifyToken, verifyRole(['admin']), async (req, res) => {
+  try {
+    const { userId, action, status, limit = 100, skip = 0 } = req.query;
+    let filter = {};
+    if (userId) filter.user = userId;
+    if (action) filter.action = action;
+    if (status) filter.status = status;
+
+    const logs = await Log.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(Number(limit))
+      .skip(Number(skip))
+      .populate('user', 'username email role');
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch logs" });
+  }
+});
 
 module.exports = router;
