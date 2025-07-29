@@ -75,6 +75,13 @@ const recipeSchema = new mongoose.Schema({
         default: true, // recipes are default to be public 
     },
 
+    isApproved: {
+        type: Boolean, 
+        default: false,
+    }, 
+
+   
+    
     comments: [commentSchema],
 
     savedBy: [
@@ -84,7 +91,8 @@ const recipeSchema = new mongoose.Schema({
         }
     ]
 
-    }
+    }, 
+    { timestamps: true }
 );
 
 const Recipe = mongoose.model('Recipe', recipeSchema);

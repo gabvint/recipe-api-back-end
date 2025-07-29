@@ -3,19 +3,35 @@ const verifyToken = require('../middleware/verify-token.js');
 const router = express.Router();
 const Recipe = require('../models/recipe.js');
 const User = require('../models/user.js');
-
+const logEvent = require('../utils/logEvents.js');
+const Log = require('../models/logs.js');
 const multer = require('multer');
+const verifyRole = require('../middleware/verify-role.js');
 
 router.use(verifyToken);
 
 
 // create recipes 
 router.post('/', async (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try {
        
         req.body.author = req.user._id
-        const recipe = await Recipe.create(req.body)
+        const recipe = await Recipe.create({
+            ...req.body, 
+            isApproved: false, 
+        });
+
         recipe._doc.author = req.user 
+
+        await logEvent({ 
+            user: req.user._id, 
+            action: 'recipe creation',
+            status: 'success', 
+            details: `recipe = ${recipe.name}`,
+            ip 
+        });
+
         res.status(201).json(recipe)
 
     } catch (error) {
@@ -27,7 +43,7 @@ router.post('/', async (req, res) => {
 // get all recipes
 router.get('/', async (req, res) => {
     try {
-        const recipe = await Recipe.find({ isPublic: true }).populate('author')
+        const recipe = await Recipe.find({ isApproved: true , isPublic: true }).populate('author')
          res.status(200).json(recipe)
 
     } catch (error) {
@@ -35,6 +51,18 @@ router.get('/', async (req, res) => {
         res.status(500).json(error);
     }
 });
+
+// get all pending recipes
+router.get('/pending', verifyToken, verifyRole(['moderator']), async (req, res) => {
+    try {
+        const pending = await Recipe.find({ isPublic: true }).populate('author')
+        res.status(200).json(pending)
+
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch pending recipes.' });
+    }
+}); 
+
 
 // get all of the user's recipes
 router.get('/user/:userId', async (req, res) => {
@@ -199,5 +227,34 @@ router.delete('/:recipeId/comments/:commentId', async (req, res) => {
 })
 
 
+// approve a recipe for r
+router.patch('/:id/approve', verifyToken, verifyRole(['moderator']), async (req, res) => {
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  try {
+    const { approve } = req.body; 
+    const recipe = await Recipe.findById(req.params.id);
+    const moderatorId = req.user._id;
+
+    if (!recipe){
+        return res.status(404).json({ error: "Recipe not found." });
+    } 
+
+    recipe.isApproved = !!approve;
+    await recipe.save();
+
+    await logEvent({ 
+        user: moderatorId, 
+        action: 'recipe approval',
+        status: 'success', 
+        details: `approved recipe = ${recipe.name} `,
+        ip 
+    });
+
+    res.json({ message: approve ? "Recipe approved." : "Recipe unapproved.", recipe });
+
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update recipe approval.' });
+  }
+});
 
 module.exports = router;
