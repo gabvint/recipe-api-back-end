@@ -17,6 +17,7 @@ const passwordRegEx = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>
 
 router.post('/signup', async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const { firstname, lastname, email, username } = req.body;
     try {   
 
         if (!passwordRegEx.test(req.body.password)){
@@ -34,6 +35,22 @@ router.post('/signup', async (req, res) => {
         }
         if (emailInDatabase) {
             return res.json({error: 'Email already taken.'});
+        }
+
+        if (!firstname || firstname.length < 2 || firstname.length > 30){
+            return res.json({ error: 'First name must be 2-30 characters.' });
+        }
+
+        if (!lastname || lastname.length < 2 || lastname.length > 30){
+            return res.json({ error: 'Last name must be 2-30 characters.' });
+        }
+
+        if (!username || username.length < 2 || username.length > 30){
+            return res.json({ error: 'Username must be 4-30 characters.' });
+        }
+
+        if (!email || email.length > 50){
+            return res.json({ error: 'Email is required and must be under 50 characters.' });
         }
 
         // Create a new user with hashed password
