@@ -21,11 +21,13 @@ const ingredientSchema = new mongoose.Schema({
     name: {
         type: String, 
         required: true,
+        maxlength: 20,
     },
 
     measurement: {
         type: String, 
         required: true,
+        maxlength: 20,
     }
 
 });
@@ -34,6 +36,7 @@ const instructionSchema = new mongoose.Schema({
 
     description: {
         type: String,
+        maxlength: 50,
     }
 
 });
@@ -43,6 +46,8 @@ const recipeSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
+        minlength: 2,
+        maxlength: 20,
     },
     
     imageUrl: {
@@ -53,11 +58,13 @@ const recipeSchema = new mongoose.Schema({
     preptime: {
         type: String, 
         required: true,
+        maxlength: 10,
     },
 
     cooktime: {
         type: String, 
         required: true,
+        maxlength: 10,
     },
 
     

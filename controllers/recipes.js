@@ -15,7 +15,7 @@ router.use(verifyToken);
 router.post('/', async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try {
-       
+
         req.body.author = req.user._id
         const recipe = await Recipe.create({
             ...req.body, 
@@ -35,7 +35,13 @@ router.post('/', async (req, res) => {
         res.status(201).json(recipe)
 
     } catch (error) {
-        console.log(error)
+        await logEvent({ 
+            user: req.user._id, 
+            action: 'recipe creation',
+            status: 'failure', 
+            details: error.message,
+            ip 
+        });
         res.status(500).json(error)
     }
 })
@@ -53,7 +59,7 @@ router.get('/', async (req, res) => {
 });
 
 // get all pending recipes
-router.get('/pending', verifyToken, verifyRole(['moderator']), async (req, res) => {
+router.get('/pending', verifyToken, async (req, res) => {
     try {
         const pending = await Recipe.find({ isPublic: true }).populate('author')
         res.status(200).json(pending)
@@ -101,6 +107,7 @@ router.get('/:recipeId', async (req, res) => {
 
 // edit a specific recipe
 router.put('/:recipeId', async (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try {
         const recipe = await Recipe.findById(req.params.recipeId);
 
@@ -117,15 +124,31 @@ router.put('/:recipeId', async (req, res) => {
       
         updatedRecipe._doc.author = req.user;
 
+        await logEvent({ 
+            user: req.user._id, 
+            action: 'edited recipe',
+            status: 'success', 
+            details: `recipe = ${recipe.name}`,
+            ip 
+        });
+
         res.status(200).json(updatedRecipe);
 
     } catch (error) {
+        await logEvent({ 
+            user: req.user._id, 
+            action: 'edited recipe',
+            status: 'failure', 
+            details: `recipe = ${recipe.name}`,
+            ip 
+        });
         res.status(500).json(error)
     }
 })
 
 // delete a specific recipe 
 router.delete('/:recipeId', async (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try {
         const recipe = await Recipe.findById(req.params.recipeId)
 
@@ -133,10 +156,28 @@ router.delete('/:recipeId', async (req, res) => {
             return res.status(403).send ("You are not authorize to do that!");
         }
 
+         await logEvent({ 
+            user: req.user._id, 
+            action: 'deleted recipe',
+            status: 'success', 
+            details: `recipe = ${recipe.name}`,
+            ip 
+        });
+
+
         const deletedRecipe = await Recipe.findByIdAndDelete(req.params.recipeId)
 
+       
         res.status(200).json(deletedRecipe)
     } catch (error) {
+        await logEvent({ 
+            user: req.user._id, 
+            action: 'deleted recipe',
+            status: 'failure', 
+            details: error.message,
+            ip 
+        });
+
         res.status(500).json(error)
     }
 })
