@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
 });
 
 // get all pending recipes
-router.get('/pending', verifyToken, async (req, res) => {
+router.get('/pending', verifyToken, verifyRole(['moderator']), async (req, res) => {
     try {
         const pending = await Recipe.find({ isPublic: true }).populate('author')
         res.status(200).json(pending)

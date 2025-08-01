@@ -89,20 +89,19 @@ router.post('/signin', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.body.username });
 
-        if (!user){
+        if (!user) {
             await logEvent({ action: 'login', status: 'failure', details: 'User not found', ip });
             return res.status(401).json({ error: 'Invalid username or password.' });
         }
 
-        // track last login attempt
+        // Track last login attempt 
         user.lastLoginAttempt = new Date();
-        await user.save();
 
         // check if the user's account is locked and if the lock time has passed
         if (user.isLocked && user.lockUntil > Date.now()) {
             const remainingTime = user.lockUntil - Date.now();
-            const remainingMinutes = Math.ceil(remainingTime / (1000 * 60)); 
-
+            const remainingMinutes = Math.ceil(remainingTime / (1000 * 60));
+            await user.save();
             return res.status(403).json({
                 error: `Account locked. Try again in ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}.`
             });
@@ -111,60 +110,66 @@ router.post('/signin', async (req, res) => {
         // If the lock period has passed, reset the failed attempts and lock status
         if (user.isLocked && user.lockUntil < Date.now()) {
             user.isLocked = false;
-            user.failedLoginAttempts = 0; // Reset failed attempts after lockout period
-            user.lockUntil = null; // Remove the lock time
-            await user.save();
+            user.failedLoginAttempts = 0;
+            user.lockUntil = null;
         }
-
 
         const passwordMatch = bcrypt.compareSync(req.body.password, user.hashedPassword);
 
         if (passwordMatch) {
-            // reset failed attempts on successful login 
+            // Save previous successful login before overwriting
+            const previousLogin = user.lastLogin;
+
+            // On success, set lastLogin to NOW, reset failed attempts, and save
+            user.lastLogin = new Date();
+            user.failedLoginAttempts = 0;
+
             await logEvent({ user: user._id, action: 'login', status: 'success', ip });
-            user.failedLoginAttempts = 0; 
             await user.save();
 
-             const token = jwt.sign(
+            const token = jwt.sign(
                 {
                     _id: user._id,
                     username: user.username,
-                    role: user.role  
+                    role: user.role
                 },
-                process.env.JWT_SECRET,  
-                { expiresIn: '1h' }  
+                process.env.JWT_SECRET,
+                { expiresIn: '1h' }
             );
-            res.status(200).json({ token }); 
+            // Send previousLogin to frontend (or null if never logged in before)
+            res.status(200).json({
+                token,
+                lastLogin: previousLogin, 
+                username: user.username
+            });
         } else {
-            user.failedLoginAttempts += 1; 
+            user.failedLoginAttempts += 1;
 
-            await logEvent({ 
-                user: user._id, 
-                action: 'login', 
-                status: 'failure', 
-                details:  `Failed login attempt = ${user.failedLoginAttempts}`, 
-                ip 
+            await logEvent({
+                user: user._id,
+                action: 'login',
+                status: 'failure',
+                details: `Failed login attempt = ${user.failedLoginAttempts}`,
+                ip
             });
 
-
-            if (user.failedLoginAttempts >= 5){
-                await logEvent({ 
-                    user: user._id, 
-                    action: 'login', 
-                    status: 'failure', 
-                    details:  `Account locked for 15 minutes`, 
-                    ip 
+            if (user.failedLoginAttempts >= 5) {
+                await logEvent({
+                    user: user._id,
+                    action: 'login',
+                    status: 'failure',
+                    details: `Account locked for 15 minutes`,
+                    ip
                 });
-                user.isLocked = true; 
-                user.lockUntil = Date.now() + 15 * 60 * 1000; // lock for 15 mins 
+                user.isLocked = true;
+                user.lockUntil = Date.now() + 15 * 60 * 1000; // lock for 15 mins
             }
-            await user.save(); 
+            await user.save();
             res.status(401).json({ error: 'Invalid username or password.' });
         }
-
     } catch (error) {
         await logEvent({ action: 'login', status: 'failure', details: error.message, ip });
-        res.status(400).json({ error: "Invalid request."  });
+        res.status(400).json({ error: "Invalid request." });
     }
 });
 
